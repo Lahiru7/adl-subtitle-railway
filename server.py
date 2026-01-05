@@ -1,10 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from libretranslatepy import LibreTranslate
+from libretranslatepy import LibreTranslateAPI
 
 app = FastAPI(title="ADL Subtitle Translator")
 
-translator = LibreTranslate("https://libretranslate.de")
+translator = LibreTranslateAPI("https://libretranslate.de")
 
 class TranslateRequest(BaseModel):
     text: str

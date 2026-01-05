@@ -1,49 +1,73 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import aiohttp
+import requests
+import random
+import time
 
-app = FastAPI()
+app = FastAPI(title="ADL Subtitle Translator")
 
+# 🔥 YOUR RAILWAY LIBRETRANSLATE SERVICE
 LIBRE_ENDPOINTS = [
-    "https://translate.terraprint.co/translate",
-    "https://libretranslate.com/translate",
-    "https://libretranslate.de/translate"
+    "https://libretranslate-production-7c5c.up.railway.app/translate"
 ]
 
-class Req(BaseModel):
+class TranslateRequest(BaseModel):
     text: str
-    src: str = "en"
-    dest: str = "si"
+    src: str
+    dest: str
 
-@app.post("/translate")
-async def translate(req: Req):
-    last_error = None
+class TranslateResponse(BaseModel):
+    translated_text: str
 
-    for url in LIBRE_ENDPOINTS:
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    url,
-                    json={
-                        "q": req.text,
-                        "source": req.src,
-                        "target": req.dest,
-                        "format": "text"
-                    },
-                    headers={"Accept": "application/json"},
-                    timeout=60
-                ) as r:
+@app.post("/translate", response_model=TranslateResponse)
+def translate(req: TranslateRequest):
+    endpoint = random.choice(LIBRE_ENDPOINTS)
 
-                    # Ensure JSON response
-                    if "application/json" not in r.headers.get("Content-Type", ""):
-                        raise Exception(f"Non-JSON response from {url}")
+    payload = {
+        "q": req.text,
+        "source": req.src,
+        "target": req.dest,
+        "format": "text"
+    }
 
-                    data = await r.json()
-                    if "translatedText" in data:
-                        return {"translated": data["translatedText"]}
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
 
-        except Exception as e:
-            last_error = str(e)
-            continue
+    try:
+        response = requests.post(
+            endpoint,
+            json=payload,
+            headers=headers,
+            timeout=60
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    raise HTTPException(status_code=500, detail=f"All translators failed: {last_error}")
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=500,
+            detail=f"LibreTranslate error {response.status_code}: {response.text}"
+        )
+
+    try:
+        data = response.json()
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Invalid JSON response from LibreTranslate"
+        )
+
+    if "translatedText" not in data:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected response: {data}"
+        )
+
+    return TranslateResponse(translated_text=data["translatedText"])
+
+
+@app.get("/")
+def root():
+    return {"status": "ADL Subtitle Translator is running"}

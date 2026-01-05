@@ -4,7 +4,7 @@ from libretranslatepy import LibreTranslate
 
 app = FastAPI(title="ADL Subtitle Translator")
 
-lt = LibreTranslate("https://libretranslate.de")
+translator = LibreTranslate("https://libretranslate.de")
 
 class TranslateRequest(BaseModel):
     text: str
@@ -18,16 +18,18 @@ def root():
 @app.post("/translate")
 def translate(req: TranslateRequest):
     try:
-        translated = lt.translate(
+        translated_text = translator.translate(
             req.text,
-            source=req.src,
-            target=req.dest
+            req.src,
+            req.dest
         )
+
         return {
             "source": req.src,
             "target": req.dest,
             "original": req.text,
-            "translated": translated
+            "translated": translated_text
         }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
